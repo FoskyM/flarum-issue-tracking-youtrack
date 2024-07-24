@@ -1,0 +1,9 @@
+foskym-issue-tracking-youtrack:
+  admin:
+    fields:
+      heading: "问题跟踪：YouTrack"
+      url_label: YouTrack 地址
+      token_label: YouTrack 令牌
+      project_label: YouTrack 项目 ID
+
+  forum:
