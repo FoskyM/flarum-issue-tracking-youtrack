@@ -2,7 +2,9 @@
     "name": "foskym/flarum-issue-tracking-youtrack",
     "description": "Youtrack Provider for Issue Tracking.",
     "keywords": [
-        "flarum"
+        "flarum",
+        "extension",
+        "youtrack"
     ],
     "type": "flarum-extension",
     "license": "MIT",
@@ -25,11 +27,11 @@
     "extra": {
         "flarum-extension": {
             "title": "Issue Tracking Youtrack",
-            "category": "",
+            "category": "provider",
             "icon": {
-                "name": "",
-                "color": "",
-                "backgroundColor": ""
+                "name": "fas fa-planet-moon",
+                "color": "#ffffff",
+                "backgroundColor": "#fb41a5"
             }
         },
         "flarum-cli": {
