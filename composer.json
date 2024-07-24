@@ -29,7 +29,7 @@
             "title": "Issue Tracking Youtrack",
             "category": "provider",
             "icon": {
-                "name": "fas fa-planet-moon",
+                "name": "fas fa-network-wired",
                 "color": "#ffffff",
                 "backgroundColor": "#fb41a5"
             }
