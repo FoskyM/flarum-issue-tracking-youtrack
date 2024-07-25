@@ -30,6 +30,19 @@ class PlatformProvider extends AbstractPlatformProvider
         ];
     }
 
+    public function testConnection(): bool
+    {
+        $settings = $this->getSettings();
+        $youtrack = new YouTrack(
+            $settings['url'],
+            $settings['token'],
+            $settings['project']
+        );
+        $youtrack = $youtrack->init();
+        $result = $youtrack->request('GET', '/admin/projects/' . $settings['project']);
+        return $result->isStatusCode(200);
+    }
+
     public function getIssueList(string $sort = 'latest'): array
     {
         $settings = $this->getSettings();
