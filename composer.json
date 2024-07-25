@@ -9,9 +9,9 @@
     "type": "flarum-extension",
     "license": "MIT",
     "require": {
-        "flarum/core": "^1.8.0",
-        "cybercog/youtrack-rest-php": "*",
-        "foskym/flarum-issue-tracking": "*"
+        "foskym/flarum-issue-tracking": "*",
+        "foskym/youtrack-rest-php": "*",
+        "flarum/core": "^1.8"
     },
     "authors": [
         {
