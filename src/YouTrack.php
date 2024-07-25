@@ -11,27 +11,64 @@ class YouTrack
     protected $project;
     public function __construct($url, $token, $project)
     {
-        $this->url = $url;
-        $this->token = $token;
-        $this->project = $project;
+        $this->url = rtrim(str_replace("\r\n", '', $url), '/') . '/api';
+        $this->token = str_replace("\r\n", '', $token);
+        $this->project = str_replace("\r\n", '', $project);
     }
 
-    public function init(): \Cog\YouTrack\Rest\Client\YouTrackClient
+    public function statusCode($path, $method = 'GET', $data = [])
     {
-        // Instantiate PSR-7 HTTP Client
-        $psrHttpClient = new \GuzzleHttp\Client([
-            'base_uri' => $this->url,
+        $response = $this->request($path, $method, $data);
+        return $response['code'];
+    }
+    public function get($path)
+    {
+        $response = $this->request($path);
+        return json_decode($response['response'], true);
+    }
+    public function post($path, $data)
+    {
+        $response = $this->request($path, 'POST', $data);
+        return json_decode($response['response'], true);
+    }
+    public function request($path, $method = 'GET', $data = [])
+    {
+        $curl = curl_init();
+        $curl = curl_init();
+
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $this->url . $path,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_SSL_VERIFYHOST => 0,
+            CURLOPT_SSL_VERIFYPEER => 0,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->token,
+                'Content-Type: application/json',
+            ],
         ]);
 
-        // Instantiate YouTrack API HTTP Client Adapter
-        $httpClient = new \Cog\YouTrack\Rest\HttpClient\GuzzleHttpClient($psrHttpClient);
+        if ($method === 'POST') {
+            curl_setopt($curl, CURLOPT_POST, true);
+            curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data));
+        }
 
-        // Instantiate YouTrack API Token Authorizer
-        $authorizer = new \Cog\YouTrack\Rest\Authorizer\TokenAuthorizer($this->token);
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+        $code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
 
-        // Instantiate YouTrack API Client
-        $youtrack = new \Cog\YouTrack\Rest\Client\YouTrackClient($httpClient, $authorizer);
+        if ($err) {
+            throw new \Exception($err);
+        }
 
-        return $youtrack;
+        return [
+            'code' => $code,
+            'response' => $response,
+        ];
     }
 }

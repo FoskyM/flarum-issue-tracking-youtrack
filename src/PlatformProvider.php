@@ -38,9 +38,9 @@ class PlatformProvider extends AbstractPlatformProvider
             $settings['token'],
             $settings['project']
         );
-        $youtrack = $youtrack->init();
-        $result = $youtrack->request('GET', '/admin/projects/' . $settings['project']);
-        return $result->isStatusCode(200);
+        
+        $result = $youtrack->statusCode('/admin/projects/' . $settings['project']);
+        return $result == 200;
     }
 
     public function getIssueList(string $sort = 'latest'): array
@@ -51,7 +51,6 @@ class PlatformProvider extends AbstractPlatformProvider
             $settings['token'],
             $settings['project']
         );
-        $youtrack = $youtrack->init();
         // Fetch issues from the platform
         // $issues = $youtrack->request('GET', '/issues?fields=id,idReadable,summary,description,reporter(login)');
         // $issues = $youtrack->request('GET', '/admin/projects/' . $settings['project'] . '/issues?&query=sort by: {updated} desc&fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))');
@@ -63,19 +62,16 @@ class PlatformProvider extends AbstractPlatformProvider
         } else if ($sort == 'oldest') {
             $query .= '{created} asc';
         }
-        $issueNodes = $youtrack->request('GET', '/sortedIssues?query=' . $query . '&fields=tree(id)');
-        $issueNodes = $issueNodes->toArray();
+
+        $issueNodes = $youtrack->get('/sortedIssues?query=' . urlencode($query) . '&fields=tree(id)');
         $payload = [];
         foreach ($issueNodes['tree'] as $node) {
             $payload[] = [
                 'id' => $node['id']
             ];
         }
-        $issues = $youtrack->request('POST', '/issuesGetter?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))', [], [
-            'json' => $payload
-        ]);
+        $issues = $youtrack->post('/issuesGetter?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))', $payload);
         // print_r($issues->toArray());
-        $issues = $issues->toArray();
         // return [];
         // map issues to the required format
         return array_map(function ($issue) {
@@ -117,9 +113,6 @@ class PlatformProvider extends AbstractPlatformProvider
             $model->progress = $this->calculateIssueProgress($model);
             return $model;
         }, $issues);
-        // $issue = $youtrack->request('GET', '/issues/' . $issues[0]['id'] . '?fields=id,idReadable,summary,description,customFields(id,name,value(avatarUrl,buildLink,color(id),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))');
-        // print_r($issue->toArray());
-        // return [];
     }
 
     public function getIssue(string $issueId): AbstractIssue
@@ -130,9 +123,7 @@ class PlatformProvider extends AbstractPlatformProvider
             $settings['token'],
             $settings['project']
         );
-        $youtrack = $youtrack->init();
-        $issue = $youtrack->request('GET', '/issues/' . $issueId . '?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))');
-        $issue = $issue->toArray();
+        $issue = $youtrack->get('/issues/' . $issueId . '?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))');
 
         $state = [];
         $priority = [];
@@ -182,15 +173,10 @@ class PlatformProvider extends AbstractPlatformProvider
             $settings['token'],
             $settings['project']
         );
-        $youtrack = $youtrack->init();
-        $result = $youtrack->request('POST', '/admin/projects/' . $settings['project'] . '/issues?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))', [], [
-            'json' => [
-                'summary' => $title,
-                'description' => $description
-            ]
+        $issue = $youtrack->post('/admin/projects/' . $settings['project'] . '/issues?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))', [
+            'summary' => $title,
+            'description' => $description
         ]);
-
-        $issue = $result->toArray();
 
         $state = [];
         $priority = [];
@@ -241,15 +227,13 @@ class PlatformProvider extends AbstractPlatformProvider
             $settings['token'],
             $settings['project']
         );
-        $youtrack = $youtrack->init();
+
         try {
-            $result = $youtrack->request('POST', '/issues/' . $issueId . '/comments', [], [
-                'json' => [
-                    'text' => "**{$user->username}**\n{$content}",
-                ]
+            $result = $youtrack->request('/issues/' . $issueId . '/comments', 'POST', [
+                'text' => "**{$user->username}**\n{$content}",
             ]);
 
-            return true;
+            return $result['code'] == 200;
         } catch (\Exception $e) {
             return false;
         }

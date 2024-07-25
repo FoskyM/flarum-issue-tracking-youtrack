@@ -10,8 +10,9 @@
     "license": "MIT",
     "require": {
         "foskym/flarum-issue-tracking": "*",
-        "foskym/youtrack-rest-php": "*",
-        "flarum/core": "^1.8"
+        "flarum/core": "^1.8",
+        "ext-json": "*",
+        "ext-curl": "*"
     },
     "authors": [
         {
