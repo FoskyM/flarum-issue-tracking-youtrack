@@ -43,7 +43,7 @@ class PlatformProvider extends AbstractPlatformProvider
         return $result == 200;
     }
 
-    public function getIssueList(string $sort = 'latest'): array
+    public function getIssueList(string $sort = 'latest', int $skip = 0, int $limit = 15): array
     {
         $settings = $this->getSettings();
         $youtrack = new YouTrack(
@@ -51,9 +51,7 @@ class PlatformProvider extends AbstractPlatformProvider
             $settings['token'],
             $settings['project']
         );
-        // Fetch issues from the platform
-        // $issues = $youtrack->request('GET', '/issues?fields=id,idReadable,summary,description,reporter(login)');
-        // $issues = $youtrack->request('GET', '/admin/projects/' . $settings['project'] . '/issues?&query=sort by: {updated} desc&fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))');
+
         $query = 'project: ' . $settings['project'] . ' sort by: ';
         if ($sort == 'latest') {
             $query .= '{updated} desc';
@@ -63,16 +61,7 @@ class PlatformProvider extends AbstractPlatformProvider
             $query .= '{created} asc';
         }
 
-        $issueNodes = $youtrack->get('/sortedIssues?query=' . urlencode($query) . '&fields=tree(id)');
-        $payload = [];
-        foreach ($issueNodes['tree'] as $node) {
-            $payload[] = [
-                'id' => $node['id']
-            ];
-        }
-        $issues = $youtrack->post('/issuesGetter?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))', $payload);
-        // print_r($issues->toArray());
-        // return [];
+        $issues = $youtrack->get('/issues?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))&query=' . urlencode($query) . '&$skip=' . $skip . '&$top=' . $limit);
         // map issues to the required format
         return array_map(function ($issue) use ($settings) {
             $state = [];
