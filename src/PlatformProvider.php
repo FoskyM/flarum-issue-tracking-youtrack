@@ -247,7 +247,7 @@ class PlatformProvider extends AbstractPlatformProvider
         $settings = $this->getSettings();
         $stateField = $settings['state_field'];
         $resolvedState = $settings['resolved_state'];
-        $stateField = str_replace('{Resolved_State}', $resolvedState, $stateField);
+        $stateField = str_replace('[Resolved_State]', $resolvedState, $stateField);
         $stateField = explode(',', $stateField);
         $stateField = array_map(function ($state) {
             return trim($state);

@@ -10,4 +10,16 @@ foskym-issue-tracking-youtrack:
       state_field_label: "State Field"
       resolved_state_label: "Resolved State"
 
+      url_help: "The URL of your YouTrack instance. Example: https://example.myjetbrains.com/youtrack"
+      token_help: "The permanent token for the YouTrack API. You can create one in your YouTrack profile settings."
+      project_help: "The ID of the project you want to track. You can find it in the URL of the project page."
+      state_field_help: |
+        The name of the field in your YouTrack project that represents the state of an issue.
+        It will be used to determine the progress of the issue.
+        Example: Submitted,Open|Reopened,To be discussed,In Progress,[Resolved_State]
+        The variable [Resolved_State] will be replaced with the value of the Resolved State field.
+      resolved_state_help: |
+        The value of the state field that represents a resolved issue.
+        Example: Done|Fixed|Resolved
+
   forum:
