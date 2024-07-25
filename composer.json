@@ -10,7 +10,7 @@
     "license": "MIT",
     "require": {
         "flarum/core": "^1.8.0",
-        "cybercog/youtrack-rest-php": "7.0",
+        "cybercog/youtrack-rest-php": "*",
         "foskym/flarum-issue-tracking": "*"
     },
     "authors": [
