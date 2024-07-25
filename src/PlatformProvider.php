@@ -273,19 +273,29 @@ class PlatformProvider extends AbstractPlatformProvider
 
     public function getLatestProgress(): AbstractProgress
     {
-        $issues = $this->getIssueList('latest');
+        $settings = $this->getSettings();
+        $youtrack = new YouTrack(
+            $settings['url'],
+            $settings['token'],
+            $settings['project']
+        );
+
+        $total = $youtrack->post('/issuesGetter/count?fields=count', [
+            'query' => 'project: ' . $settings['project']
+        ])['count'];
+        $resolved  = $youtrack->post('/issuesGetter/count?fields=count', [
+            'query' => 'project: ' . $settings['project'] . ' #Resolved'
+        ])['count'];
+
+        $query = urlencode('project: ' . $settings['project'] . ' sort by: {updated} desc');
+        $issue = $youtrack->get('/issues?query=' . $query . '&$top=1&$skip=0&fields=id,updated,resolved,created');
 
         $progress = new AbstractProgress();
 
-        $progress->updated_at = $issues[0]->updated_at;
-        array_map(function ($issue) use ($progress) {
-            $progress->total++;
-            if ($this->isIssueResolved($issue)) {
-                $progress->resolved++;
-            } else {
-                $progress->unresolved++;
-            }
-        }, $issues);
+        $progress->updated_at = $issue[0]['updated'] / 1000;
+        $progress->total = $total;
+        $progress->resolved = $resolved;
+        $progress->unresolved = $total - $resolved;
 
         return $progress;
     }
