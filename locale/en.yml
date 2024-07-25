@@ -7,5 +7,7 @@ foskym-issue-tracking-youtrack:
       url_label: "YouTrack URL"
       token_label: "YouTrack Token"
       project_label: "YouTrack Project ID"
+      state_field_label: "State Field"
+      resolved_state_label: "Resolved State"
 
   forum:

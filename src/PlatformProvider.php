@@ -7,6 +7,7 @@ use Flarum\User\User;
 
 use FoskyM\IssueTracking\AbstractPlatformProvider;
 use FoskyM\IssueTracking\AbstractIssue;
+use FoskyM\IssueTracking\AbstractProgress;
 use Illuminate\Support\MessageBag;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Contracts\Validation\Factory;
@@ -23,11 +24,13 @@ class PlatformProvider extends AbstractPlatformProvider
         return [
             'url' => 'required|url',
             'token' => 'required',
-            'project' => 'required'
+            'project' => 'required',
+            'state_field' => 'required',
+            'resolved_state' => 'required',
         ];
     }
 
-    public function getIssueList(): array
+    public function getIssueList(string $sort = 'latest'): array
     {
         $settings = $this->getSettings();
         $youtrack = new YouTrack(
@@ -39,7 +42,15 @@ class PlatformProvider extends AbstractPlatformProvider
         // Fetch issues from the platform
         // $issues = $youtrack->request('GET', '/issues?fields=id,idReadable,summary,description,reporter(login)');
         // $issues = $youtrack->request('GET', '/admin/projects/' . $settings['project'] . '/issues?&query=sort by: {updated} desc&fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))');
-        $issueNodes = $youtrack->request('GET', '/sortedIssues?query=project: ' . $settings['project'] . ' sort by: {updated} desc&fields=tree(id)');
+        $query = 'project: ' . $settings['project'] . ' sort by: ';
+        if ($sort == 'latest') {
+            $query .= '{updated} desc';
+        } else if ($sort == 'newest') {
+            $query .= '{created} desc';
+        } else if ($sort == 'oldest') {
+            $query .= '{created} asc';
+        }
+        $issueNodes = $youtrack->request('GET', '/sortedIssues?query=' . $query . '&fields=tree(id)');
         $issueNodes = $issueNodes->toArray();
         $payload = [];
         foreach ($issueNodes['tree'] as $node) {
@@ -89,6 +100,8 @@ class PlatformProvider extends AbstractPlatformProvider
             $model->updated_at = $issue['updated'] / 1000;
             $model->resolved_at = $issue['resolved'] / 1000;
             $model->created_at = $issue['created'] / 1000;
+            $model->is_resolved = $this->isIssueResolved($model);
+            $model->progress = $this->calculateIssueProgress($model);
             return $model;
         }, $issues);
         // $issue = $youtrack->request('GET', '/issues/' . $issues[0]['id'] . '?fields=id,idReadable,summary,description,customFields(id,name,value(avatarUrl,buildLink,color(id),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))');
@@ -143,6 +156,8 @@ class PlatformProvider extends AbstractPlatformProvider
         $model->updated_at = $issue['updated'] / 1000;
         $model->resolved_at = $issue['resolved'] / 1000;
         $model->created_at = $issue['created'] / 1000;
+        $model->is_resolved = $this->isIssueResolved($model);
+        $model->progress = $this->calculateIssueProgress($model);
         return $model;
     }
 
@@ -163,7 +178,7 @@ class PlatformProvider extends AbstractPlatformProvider
         ]);
 
         $issue = $result->toArray();
-        
+
         $state = [];
         $priority = [];
         $type = [];
@@ -199,6 +214,8 @@ class PlatformProvider extends AbstractPlatformProvider
         $model->updated_at = $issue['updated'] / 1000;
         $model->resolved_at = $issue['resolved'] / 1000;
         $model->created_at = $issue['created'] / 1000;
+        $model->is_resolved = $this->isIssueResolved($model);
+        $model->progress = $this->calculateIssueProgress($model);
         return $model;
 
     }
@@ -223,5 +240,64 @@ class PlatformProvider extends AbstractPlatformProvider
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    public function calculateIssueProgress(AbstractIssue $issue): float
+    {
+        $settings = $this->getSettings();
+        $stateField = $settings['state_field'];
+        $resolvedState = $settings['resolved_state'];
+        $stateField = str_replace('{Resolved_State}', $resolvedState, $stateField);
+        $stateField = explode(',', $stateField);
+        $stateField = array_map(function ($state) {
+            return trim($state);
+        }, $stateField);
+        $order = 0;
+        $total = count($stateField);
+        foreach ($stateField as $state) {
+            $order++;
+            if (strpos($state, '|') !== false) {
+                $state = explode('|', $state);
+                if (in_array($issue->state['type'], $state)) {
+                    return ($order - 1) / ($total - 1);
+                }
+            } else if ($state == $issue->state['type']) {
+                return ($order - 1) / ($total - 1);
+            }
+        }
+        return 0;
+    }
+
+    public function isIssueResolved(AbstractIssue $issue): bool
+    {
+        $settings = $this->getSettings();
+        $resolvedState = $settings['resolved_state'];
+        $resolvedState = explode('|', $resolvedState);
+        $resolvedState = array_map(function ($state) {
+            return trim($state);
+        }, $resolvedState);
+        if (in_array($issue->state['type'], $resolvedState)) {
+            return true;
+        }
+        return false;
+    }
+
+    public function getLatestProgress(): AbstractProgress
+    {
+        $issues = $this->getIssueList('latest');
+
+        $progress = new AbstractProgress();
+
+        $progress->updated_at = $issues[0]->updated_at;
+        array_map(function ($issue) use ($progress) {
+            $progress->total++;
+            if ($this->isIssueResolved($issue)) {
+                $progress->resolved++;
+            } else {
+                $progress->unresolved++;
+            }
+        }, $issues);
+
+        return $progress;
     }
 }

@@ -5,5 +5,7 @@ foskym-issue-tracking-youtrack:
       url_label: YouTrack 地址
       token_label: YouTrack 令牌
       project_label: YouTrack 项目 ID
+      state_field_label: 状态字段
+      resolved_state_label: 已解决状态
 
   forum:
