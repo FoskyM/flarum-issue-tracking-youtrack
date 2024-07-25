@@ -74,7 +74,7 @@ class PlatformProvider extends AbstractPlatformProvider
         // print_r($issues->toArray());
         // return [];
         // map issues to the required format
-        return array_map(function ($issue) {
+        return array_map(function ($issue) use ($settings) {
             $state = [];
             $priority = [];
             $type = [];
@@ -111,6 +111,7 @@ class PlatformProvider extends AbstractPlatformProvider
             $model->created_at = $issue['created'] / 1000;
             $model->is_resolved = $this->isIssueResolved($model);
             $model->progress = $this->calculateIssueProgress($model);
+            $model->link = $settings['url'] . '/issue/' . $model->slug;
             return $model;
         }, $issues);
     }
@@ -162,6 +163,7 @@ class PlatformProvider extends AbstractPlatformProvider
         $model->created_at = $issue['created'] / 1000;
         $model->is_resolved = $this->isIssueResolved($model);
         $model->progress = $this->calculateIssueProgress($model);
+        $model->link = $settings['url'] . '/issue/' . $model->slug;
         return $model;
     }
 
@@ -215,6 +217,7 @@ class PlatformProvider extends AbstractPlatformProvider
         $model->created_at = $issue['created'] / 1000;
         $model->is_resolved = $this->isIssueResolved($model);
         $model->progress = $this->calculateIssueProgress($model);
+        $model->link = $settings['url'] . '/issue/' . $model->slug;
         return $model;
 
     }

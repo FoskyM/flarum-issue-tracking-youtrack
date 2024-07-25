@@ -9,7 +9,7 @@
     "type": "flarum-extension",
     "license": "MIT",
     "require": {
-        "foskym/flarum-issue-tracking": "*",
+        "foskym/flarum-issue-tracking": "^0.2.0",
         "flarum/core": "^1.8",
         "ext-json": "*",
         "ext-curl": "*"
