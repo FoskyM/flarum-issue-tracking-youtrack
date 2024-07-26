@@ -86,8 +86,8 @@ class PlatformProvider extends AbstractPlatformProvider
                 $assignee->username = $field['value']['login'] ?? '';
                 $assignee->display_name = $field['value']['fullName'] ?? '';
                 $assignee->email = $field['value']['email'] ?? '';
-            } else if ($field['name'] === 'SimpleIssueCustomFields') {
-                $SimpleIssueCustomFields['name'] = $field['value'];
+            } else if ($field['$type'] === 'SimpleIssueCustomField') {
+                $SimpleIssueCustomFields[$field['name']] = $field['value'];
             }
         }
 
@@ -113,12 +113,12 @@ class PlatformProvider extends AbstractPlatformProvider
         }
 
         $mappingFields = explode(',', $settings['fields_mapping']);
-        array_map(function ($field) use ($SimpleIssueCustomFields) {
+        array_map(function ($field) use ($SimpleIssueCustomFields, $model) {
             list($key, $value) = explode(':', $field);
             if (isset($SimpleIssueCustomFields[$key])) {
                 list($object, $varaible) = explode('.', $value);
-                if (isset($object->$varaible)) {
-                    $object->$varaible = $SimpleIssueCustomFields[$key];
+                if (isset($model->$object->$varaible)) {
+                    $model->$object->$varaible = $SimpleIssueCustomFields[$key];
                 }
             }
         }, $mappingFields);
