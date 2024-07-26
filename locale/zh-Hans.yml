@@ -7,6 +7,7 @@ foskym-issue-tracking-youtrack:
       project_label: YouTrack 项目 ID
       state_field_label: 状态字段
       resolved_state_label: 已解决状态
+      fields_mapping_label: 字段映射
 
       url_help: "您的 YouTrack 实例的 URL。例如：https://example.youtrack.cloud/"
       token_help: "YouTrack API 的永久令牌。您可以在您的 YouTrack 个人资料设置中创建一个。"
@@ -19,5 +20,9 @@ foskym-issue-tracking-youtrack:
       resolved_state_help: |
         表示已解决问题的状态字段的值。
         例如：Done|Fixed|Resolved
+      fields_mapping_help: |
+        您的 YouTrack 项目的 SimpleIssueCustomField 到普通字段的映射。
+        格式为：SimpleIssueCustomField 名称:普通字段名称
+        例如：原始作者:author.display_name,原始作者邮箱:author.email,原始分配者:assignee.display_name
 
   forum:

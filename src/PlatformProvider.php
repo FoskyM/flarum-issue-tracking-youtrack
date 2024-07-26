@@ -8,6 +8,9 @@ use Flarum\User\User;
 use FoskyM\IssueTracking\AbstractPlatformProvider;
 use FoskyM\IssueTracking\AbstractIssue;
 use FoskyM\IssueTracking\AbstractProgress;
+use FoskyM\IssueTracking\AbstractUser;
+use FoskyM\IssueTracking\AbstractLabel;
+
 use Illuminate\Support\MessageBag;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Contracts\Validation\Factory;
@@ -19,14 +22,17 @@ class PlatformProvider extends AbstractPlatformProvider
     public $key = "foskym-issue-tracking-youtrack";
     public $name = "YouTrack";
 
+    const FIELDS = "id,idReadable,summary,description,reporter(login,name,email),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,email,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))";
+
     public function availableSettings(): array
     {
         return [
             'url' => 'required|url',
             'token' => 'required',
             'project' => 'required',
-            'state_field' => 'required',
-            'resolved_state' => 'required',
+            'state_field' => '',
+            'resolved_state' => '',
+            'fields_mapping' => '',
         ];
     }
 
@@ -41,6 +47,83 @@ class PlatformProvider extends AbstractPlatformProvider
         
         $result = $youtrack->statusCode('/admin/projects/' . $settings['project']);
         return $result == 200;
+    }
+
+    private function buildIssue(array $issue): AbstractIssue
+    {
+        $settings = $this->getSettings();
+
+        $state = new AbstractLabel();
+        $priority = new AbstractLabel();
+        $type = new AbstractLabel();
+
+        $assignee = new AbstractUser();
+
+        $author = new AbstractUser();
+        $author->username = $issue['reporter']['login'] ?? '';
+        $author->display_name = $issue['reporter']['name'] ?? '';
+        $author->email = $issue['reporter']['email'] ?? '';
+
+        $SimpleIssueCustomFields = [];
+
+        foreach ($issue['customFields'] as $field) {
+            if ($field['name'] == 'State') {
+                $state->name = $field['value']['localizedName'];
+                $state->foreground = $field['value']['color']['foreground'];
+                $state->background = $field['value']['color']['background'];
+                $state->type = $field['value']['name'];
+            } else if ($field['name'] == 'Priority') {
+                $priority->name = $field['value']['localizedName'];
+                $priority->foreground = $field['value']['color']['foreground'];
+                $priority->background = $field['value']['color']['background'];
+                $priority->type = $field['value']['name'];
+            } else if ($field['name'] == 'Type') {
+                $type->name = $field['value']['localizedName'];
+                $type->foreground = $field['value']['color']['foreground'];
+                $type->background = $field['value']['color']['background'];
+                $type->type = $field['value']['name'];
+            } else if ($field['name'] === 'Assignee') {
+                $assignee->username = $field['value']['login'] ?? '';
+                $assignee->display_name = $field['value']['fullName'] ?? '';
+                $assignee->email = $field['value']['email'] ?? '';
+            } else if ($field['name'] === 'SimpleIssueCustomFields') {
+                $SimpleIssueCustomFields['name'] = $field['value'];
+            }
+        }
+
+        $model = new AbstractIssue();
+        $model->id = $issue['id'];
+        $model->slug = $issue['idReadable'];
+        $model->title = $issue['summary'];
+        $model->description = $issue['description'] ?? $issue['summary'];
+        $model->author = $author;
+        $model->assignee = $assignee;
+        $model->state = $state;
+        $model->priority = $priority;
+        $model->type = $type;
+        $model->updated_at = $issue['updated'] / 1000;
+        $model->resolved_at = $issue['resolved'] / 1000;
+        $model->created_at = $issue['created'] / 1000;
+        $model->is_resolved = $this->isIssueResolved($model);
+        $model->progress = $this->calculateIssueProgress($model);
+        $model->link = $settings['url'] . '/issue/' . $model->slug;
+
+        if (is_null($settings['fields_mapping'])) {
+            return $model;
+        }
+
+        $mappingFields = explode(',', $settings['fields_mapping']);
+        array_map(function ($field) use ($SimpleIssueCustomFields) {
+            list($key, $value) = explode(':', $field);
+            if (isset($SimpleIssueCustomFields[$key])) {
+                list($object, $varaible) = explode('.', $value);
+                if (isset($object->$varaible)) {
+                    $object->$varaible = $SimpleIssueCustomFields[$key];
+                }
+            }
+        }, $mappingFields);
+
+        return $model;
     }
 
     public function getIssueList(string $sort = 'latest', int $skip = 0, int $limit = 15): array
@@ -61,46 +144,10 @@ class PlatformProvider extends AbstractPlatformProvider
             $query .= '{created} asc';
         }
 
-        $issues = $youtrack->get('/issues?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))&query=' . urlencode($query) . '&$skip=' . $skip . '&$top=' . $limit);
+        $issues = $youtrack->get('/issues?fields=' . self::FIELDS . '&query=' . urlencode($query) . '&$skip=' . $skip . '&$top=' . $limit);
         // map issues to the required format
-        return array_map(function ($issue) use ($settings) {
-            $state = [];
-            $priority = [];
-            $type = [];
-
-            foreach ($issue['customFields'] as $field) {
-                if ($field['name'] == 'State') {
-                    $state['name'] = $field['value']['localizedName'];
-                    $state['foreground'] = $field['value']['color']['foreground'];
-                    $state['background'] = $field['value']['color']['background'];
-                    $state['type'] = $field['value']['name'];
-                } else if ($field['name'] == 'Priority') {
-                    $priority['name'] = $field['value']['localizedName'];
-                    $priority['foreground'] = $field['value']['color']['foreground'];
-                    $priority['background'] = $field['value']['color']['background'];
-                    $priority['type'] = $field['value']['name'];
-                } else if ($field['name'] == 'Type') {
-                    $type['name'] = $field['value']['localizedName'];
-                    $type['foreground'] = $field['value']['color']['foreground'];
-                    $type['background'] = $field['value']['color']['background'];
-                    $type['type'] = $field['value']['name'];
-                }
-            }
-            $model = new AbstractIssue();
-            $model->id = $issue['id'];
-            $model->slug = $issue['idReadable'];
-            $model->title = $issue['summary'];
-            $model->description = $issue['description'];
-            $model->author = $issue['reporter']['login'];
-            $model->state = $state;
-            $model->priority = $priority;
-            $model->type = $type;
-            $model->updated_at = $issue['updated'] / 1000;
-            $model->resolved_at = $issue['resolved'] / 1000;
-            $model->created_at = $issue['created'] / 1000;
-            $model->is_resolved = $this->isIssueResolved($model);
-            $model->progress = $this->calculateIssueProgress($model);
-            $model->link = $settings['url'] . '/issue/' . $model->slug;
+        return array_map(function ($issue) {
+            $model = $this->buildIssue($issue);
             return $model;
         }, $issues);
     }
@@ -113,46 +160,9 @@ class PlatformProvider extends AbstractPlatformProvider
             $settings['token'],
             $settings['project']
         );
-        $issue = $youtrack->get('/issues/' . $issueId . '?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))');
-
-        $state = [];
-        $priority = [];
-        $type = [];
-
-        foreach ($issue['customFields'] as $field) {
-            if ($field['name'] == 'State') {
-                $state['name'] = $field['value']['localizedName'];
-                $state['foreground'] = $field['value']['color']['foreground'];
-                $state['background'] = $field['value']['color']['background'];
-                $state['type'] = $field['value']['name'];
-            } else if ($field['name'] == 'Priority') {
-                $priority['name'] = $field['value']['localizedName'];
-                $priority['foreground'] = $field['value']['color']['foreground'];
-                $priority['background'] = $field['value']['color']['background'];
-                $priority['type'] = $field['value']['name'];
-            } else if ($field['name'] == 'Type') {
-                $type['name'] = $field['value']['localizedName'];
-                $type['foreground'] = $field['value']['color']['foreground'];
-                $type['background'] = $field['value']['color']['background'];
-                $type['type'] = $field['value']['name'];
-            }
-        }
-
-        $model = new AbstractIssue();
-        $model->id = $issue['id'];
-        $model->slug = $issue['idReadable'];
-        $model->title = $issue['summary'];
-        $model->description = $issue['description'];
-        $model->author = $issue['reporter']['login'];
-        $model->state = $state;
-        $model->priority = $priority;
-        $model->type = $type;
-        $model->updated_at = $issue['updated'] / 1000;
-        $model->resolved_at = $issue['resolved'] / 1000;
-        $model->created_at = $issue['created'] / 1000;
-        $model->is_resolved = $this->isIssueResolved($model);
-        $model->progress = $this->calculateIssueProgress($model);
-        $model->link = $settings['url'] . '/issue/' . $model->slug;
+        $issue = $youtrack->get('/issues/' . $issueId . '?fields=' . self::FIELDS);
+        
+        $model = $this->buildIssue($issue);
         return $model;
     }
 
@@ -164,49 +174,12 @@ class PlatformProvider extends AbstractPlatformProvider
             $settings['token'],
             $settings['project']
         );
-        $issue = $youtrack->post('/admin/projects/' . $settings['project'] . '/issues?fields=id,idReadable,summary,description,reporter(login),tags,updated,resolved,created,comments(id,author(login),text,created,updated),customFields(id,name,value(avatarUrl,buildLink,color(id,background,foreground),fullName,id,isResolved,localizedName,login,minutes,name,presentation,text))', [
+        $issue = $youtrack->post('/admin/projects/' . $settings['project'] . '/issues?fields=' . self::FIELDS, [
             'summary' => $title,
             'description' => $description
         ]);
 
-        $state = [];
-        $priority = [];
-        $type = [];
-
-        foreach ($issue['customFields'] as $field) {
-            if ($field['name'] == 'State') {
-                $state['name'] = $field['value']['localizedName'];
-                $state['foreground'] = $field['value']['color']['foreground'];
-                $state['background'] = $field['value']['color']['background'];
-                $state['type'] = $field['value']['name'];
-            } else if ($field['name'] == 'Priority') {
-                $priority['name'] = $field['value']['localizedName'];
-                $priority['foreground'] = $field['value']['color']['foreground'];
-                $priority['background'] = $field['value']['color']['background'];
-                $priority['type'] = $field['value']['name'];
-            } else if ($field['name'] == 'Type') {
-                $type['name'] = $field['value']['localizedName'];
-                $type['foreground'] = $field['value']['color']['foreground'];
-                $type['background'] = $field['value']['color']['background'];
-                $type['type'] = $field['value']['name'];
-            }
-        }
-
-        $model = new AbstractIssue();
-        $model->id = $issue['id'];
-        $model->slug = $issue['idReadable'];
-        $model->title = $issue['summary'];
-        $model->description = $issue['description'];
-        $model->author = $issue['reporter']['login'];
-        $model->state = $state;
-        $model->priority = $priority;
-        $model->type = $type;
-        $model->updated_at = $issue['updated'] / 1000;
-        $model->resolved_at = $issue['resolved'] / 1000;
-        $model->created_at = $issue['created'] / 1000;
-        $model->is_resolved = $this->isIssueResolved($model);
-        $model->progress = $this->calculateIssueProgress($model);
-        $model->link = $settings['url'] . '/issue/' . $model->slug;
+        $model = $this->buildIssue($issue);
         return $model;
 
     }

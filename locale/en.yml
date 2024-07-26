@@ -9,6 +9,7 @@ foskym-issue-tracking-youtrack:
       project_label: "YouTrack Project ID"
       state_field_label: "State Field"
       resolved_state_label: "Resolved State"
+      fields_mapping_label: "Fields Mapping"
 
       url_help: "The URL of your YouTrack instance. Example: https://example.youtrack.cloud/"
       token_help: "The permanent token for the YouTrack API. You can create one in your YouTrack profile settings."
@@ -21,5 +22,9 @@ foskym-issue-tracking-youtrack:
       resolved_state_help: |
         The value of the state field that represents a resolved issue.
         Example: Done|Fixed|Resolved
+      fields_mapping_help: |
+        The mapping of the fields in your YouTrack project's SimpleIssueCustomField to the Normal fields.
+        The format is: SimpleIssueCustomField Name:Normal Field Name
+        Example: Original Author:author.display_name,Original Author Email:author.email,Original Assignee:assignee.display_name
 
   forum:
