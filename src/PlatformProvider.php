@@ -113,6 +113,9 @@ class PlatformProvider extends AbstractPlatformProvider
         }
 
         $mappingFields = explode(',', $settings['fields_mapping']);
+        $mappingFields = array_filter($mappingFields, function ($field) {
+            return strpos($field, ':') !== false;
+        });
         array_map(function ($field) use ($SimpleIssueCustomFields, $model) {
             list($key, $value) = explode(':', $field);
             if (isset($SimpleIssueCustomFields[$key])) {
